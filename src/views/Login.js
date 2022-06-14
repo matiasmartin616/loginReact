@@ -4,14 +4,15 @@ import { useNavigate, Link } from "react-router-dom";
 
 const Login = () => {
   const url = "http://51.38.51.187:5050/api/v1/auth/log-in";
-  let navigate = useNavigate();
   const [response, setResponse] = useState({});
-  //http body
   const [form, setForm] = useState({
     email: "",
     password: "",
   });
+  
+  let navigate = useNavigate();
 
+  //get inputs value
   const handleInputsChange = (e) => {
     setForm({
       ...form,
@@ -27,13 +28,14 @@ const Login = () => {
       .catch((error) => setResponse(error));
   }
 
-  //response management
+  //response management setting key in localStorage
   useEffect(() => {
     if (response.status && response.status === 200) {
       localStorage.setItem("key", response.data.accessToken);
     }
   }, [response]);
-
+  
+  //redirect
   useEffect(() => {
     localStorage.getItem("key") && navigate("/users");
   }, [response])
