@@ -8,7 +8,8 @@ const User = ({email, name, surname, id, refresh}) => {
     const config = {
         headers: { Authorization: `Bearer ${token}` },
       };
-    const deleteUser = async () => {
+    
+      const deleteUser = async () => {
         const url = `http://51.38.51.187:5050/api/v1/users/${id}`;
         await axios
             .delete(url, config)
