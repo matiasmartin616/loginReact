@@ -75,6 +75,11 @@ const Login = () => {
             Confirm
           </button>
         </div>
+        {response && response.name === "AxiosError" && (
+            <div className="alert alert-danger" role="alert">
+                Something went wrong. Try again.
+            </div>
+            )}
       </form>
     </div>
   );

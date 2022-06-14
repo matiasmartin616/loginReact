@@ -98,7 +98,7 @@ const Signup = () => {
                     Log in
                 </Link>
                 <button type="submit" className="btn btn-primary col-4 col-md-4">
-                    Sign up
+                    Create account
                 </button>
             </div>
             {response && response.name === "AxiosError" && (
