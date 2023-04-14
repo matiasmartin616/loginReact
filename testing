@@ -1,0 +1,1895 @@
+<?php
+
+class Api_ConsultasController extends Zend_Rest_Controller
+{
+//Seccion dedicada a atenea.
+    private $acl;
+
+    protected $_idHiberusSistemas = 9;
+    protected $_idJgimeno = 567;
+    public function init(){
+
+        $this->_helper->viewRenderer->setNoRender(true);
+        $this->acl = Zend_Registry::getInstance()->Acl;
+        $identidad = Zend_Auth::getInstance()->getIdentity();
+        $this->_iIdUsuario = $identidad->id;
+        $this->_oRolUsuario = $identidad->permisos['rol'];
+        $this->_helper->layout()->disableLayout();
+    }
+
+    public function headAction(){
+
+    }
+
+    public function indexAction(){
+
+        $this->getResponse()
+            ->setHttpResponseCode(200)
+            ->appendBody(json_encode(array('error' => 0, 'descError' => 'Devolvemos artículos')));
+
+    }
+    public function getAction(){
+
+        $this->getResponse()
+            ->appendBody(json_encode(array('error' => -2, 'descError' => 'Servicio no disponible')));
+
+    }
+
+    public function getproyectosAction(){
+        try{
+            if (!$this->acl->isAllowed($this->_oRolUsuario, 'apiProyecto', 'Ver recurso')) {
+                $this->getResponse()
+                    ->setHttpResponseCode(200)
+                    ->appendBody(json_encode(array('error' => -1, 'descError' => 'No tiene permiso para consultar proyectos')));
+
+            }else{
+                header('Content-type: application/json; charset=utf-8');
+                set_time_limit(0);
+                ini_set('memory_limit', '-1');
+
+
+                $idProyecto = addslashes($this->_getParam('idProyecto')) ?? null;
+                $serviceProyecto = new My_Service_Proyecto_Proyecto();
+
+                $proyectoCollection = $serviceProyecto->getProyectosConGrupoFinal($idProyecto);
+
+                if(is_iterable($proyectoCollection)){
+                    foreach ($proyectoCollection as $proyecto) {
+                        $arrResponse[] = [
+                            'idProyecto' => $proyecto->getIdProyecto(),
+                            'nombreProyecto' => $proyecto->getNombreProyecto(),
+                            'idClienteAsociado' => $proyecto->getFkidCliente(),
+                            'nombreClienteAsociado' => $proyecto->getNombreClienteAsociado(),
+                            'idProyectoAsociado' => $proyecto->getFkidProyecto(),
+                            'nombreProyectoAsociado' => $proyecto->getNombreProyectoAsociado(),
+                            'NIF/CIF' => $proyecto->getCifTercero(),
+                            'fkIdGrupoCliente' => $proyecto->getIdGrupoClienteFinal() ,
+                            'grupoCliente' => $proyecto->getNombreGrupoClienteFinal(),
+                            'codigoProyectoCliente' => $proyecto->getCodigoProyecto(),
+                            'codigoCRM' => $proyecto->getCodigoCrm(),
+                            'fkIdEstado' => $proyecto->getfkidEstado(),
+                            'estado' => $proyecto->getNombreEstado(),
+                            'fkIdTipoActividad' => $proyecto->getFkidTipoAct(),
+                            'tipoActividad' => $proyecto->getNombreAct(),
+                            'idTipoProyecto' => $proyecto->getIdTipoProyecto(),
+                            'tipoProyecto' => $proyecto->getNombreTipoProy(),
+                            'fkIdDimensionUno' => $proyecto->getFkidZonaTer(),
+                            'nombreDimensionUno' => $proyecto->getNombreZona(),
+                            'fkIdDimensionDos' => $proyecto->getFkidUnidad(),
+                            'nombreDimensionDos' => $proyecto->getNombreUnidad(),
+                            'fkIdDimensionTres' => $proyecto->getFkidComercial(),
+                            'nombreDimensionTres' => $proyecto->getNombreComercial(),
+                            'fkIdDimensionCuatro' => $proyecto->getFkidDireccion(),
+                            'nombreDimensionCuatro' => $proyecto->getNombreDireccion(),
+                            'fkIdDimensionSeis' => $proyecto->getFkidDelegacion(),
+                            'nombreDimensionSeis' => $proyecto->getNombreDelegacion(),
+                            'fkIdDimensionSiete' => $proyecto->getFkidDimensionsiete(),
+                            'nombreDimensionSiete' => $proyecto->getNombreDimensionsiete(),
+                            'fkIdDimensionOcho' => $proyecto->getFkIdDimensionocho(),
+                            'nombreDimensionOcho' => $proyecto->getNombreDimensionocho(),
+                            'fkIdEmpresa' => $proyecto->getFkIdEmpresa(),
+                            'nombreEmpresa' => $proyecto->getNombreEmpresa()
+                        ];
+                    }
+                }else{
+                    $arrResponse = ["proyecto no encontrado"];
+                }
+
+
+                if(!is_array($arrResponse)){
+                    $this->getResponse()
+                        ->setHttpResponseCode(500)
+                        ->appendBody(json_encode(array($arrResponse)));
+                }
+                else{
+                    $this->getResponse()
+                        ->setHttpResponseCode(200)
+                        ->appendBody(json_encode($arrResponse));
+                }
+
+            }
+        }catch(Exception $e){
+            die("error 9921");
+        }
+
+    }
+
+    public function postAction(){
+        $this->getResponse()
+            ->appendBody(json_encode(array('error' => -2, 'descError' => 'Servicio no disponible')));
+
+    }
+
+    public function putAction(){
+        $this->getResponse()
+            ->appendBody(json_encode(array('error' => -2, 'descError' => 'Servicio no disponible')));
+    }
+
+    public function deleteAction(){
+        $this->getResponse()
+            ->appendBody(json_encode(array('error' => -2, 'descError' => 'Servicio no disponible')));
+    }
+    public function getdimensionunoAction(){ //zonas ordenados por nombre ASC
+
+        if (!$this->acl->isAllowed($this->_oRolUsuario, 'apidimensiones', 'Ver recurso')) {
+            $this->getResponse()
+                ->setHttpResponseCode(200)
+                ->appendBody(json_encode(array('error' => -1, 'descError' => 'No tiene permiso para ver Dimensión uno')));
+
+        } else {
+
+            header('Content-type: application/json; charset=utf-8');
+
+            $mensaje = 'Dimension1 no localizado';
+            $error = -1;
+
+            $serviceZonas = new My_Service_Hiberus_Zona();
+            $zonasCollection = $serviceZonas->getZonasByIdEmpresa($this->_idHiberusSistemas);
+            $arrResponse = [];
+
+
+            if (!empty($zonasCollection)) {
+                foreach ($zonasCollection as $zone) {
+                    // print_r($zone);
+                    if($zone->getActivo() === "1"){
+                        $arrResponse[] = [
+                            'id' => $zone->getId(),
+                            'zona' => $zone->getNombre(),
+                            'descripcion' => $zone->getDescripcion(),
+                            'estado' => $zone->getActivo()
+                        ];
+                    }
+                }
+
+                $mensaje = $arrResponse;
+                $error = 0;
+            }
+
+            $this->getResponse()
+                ->setHttpResponseCode(200)
+                ->appendBody(json_encode(array('error' => $error, 'descError' => $mensaje)));
+        }
+    }
+
+    public function getdimensiondosAction(){//unidad de gestion ordenado por nombreUnidad ASC
+
+        if (!$this->acl->isAllowed($this->_oRolUsuario, 'apidimensiones', 'Ver recurso')) {
+            $this->getResponse()
+                ->setHttpResponseCode(200)
+                ->appendBody(json_encode(array('error' => -1, 'descError' => 'No tiene permiso para ver Dimensión dos')));
+
+        } else {
+
+            header('Content-type: application/json; charset=utf-8');
+
+            $mensaje = 'Dimension2 no localizado';
+            $error = -1;
+
+            $serviceUnidades = new My_Service_Hiberus_Unidad();
+            $unidadesCollection = $serviceUnidades->getUnidadesByEmpresa($this->_idHiberusSistemas, false);
+            $arrResponse = [];
+
+            if (!empty($unidadesCollection)) {
+                foreach ($unidadesCollection as $unidad) {
+                    if($unidad->getActivo() === "1") {
+                        $arrResponse[] = [
+                            'id' => $unidad->getId(),
+                            'nombreUnidad' => $unidad->getNombreUnidad(),
+                            'descripcion' => $unidad->getDescripcion(),
+                            'estado' => $unidad->getActivo()
+                        ];
+                    }
+                }
+
+                $mensaje = $arrResponse;
+                $error = 0;
+            }
+
+            $this->getResponse()
+                ->setHttpResponseCode(200)
+                ->appendBody(json_encode(array('error' => $error, 'descError' => $mensaje)));
+        }
+    }
+
+    public function getdimensiontresAction(){//comerciales ordenados por nombre
+
+        if (!$this->acl->isAllowed($this->_oRolUsuario, 'apidimensiones', 'Ver recurso')) {
+            $this->getResponse()
+                ->setHttpResponseCode(200)
+                ->appendBody(json_encode(array('error' => -1, 'descError' => 'No tiene permiso para ver Dimensión tres')));
+
+        } else {
+
+            header('Content-type: application/json; charset=utf-8');
+
+            $mensaje = 'Dimension3 no localizado';
+            $error = -1;
+
+            $serviceComerciales = new My_Service_Hiberus_Comercial();
+            $comercialesCollection = $serviceComerciales->getComercialesByEmpresa($this->_idHiberusSistemas, false);
+            $arrResponse = [];
+
+            if (!empty($comercialesCollection)) {
+                foreach ($comercialesCollection as $comercial) {
+                    if($comercial->getActivo() == 1){
+                        $arrResponse[] = [
+                            'id' => $comercial->getId(),
+                            'nombre' => $comercial->getNombre(),
+                            'descripcion' => $comercial->getDescripcion(),
+                            'estado' => $comercial->getActivo()
+                        ];
+                    }
+                }
+
+                $mensaje = $arrResponse;
+                $error = 0;
+            }
+
+            $this->getResponse()
+                ->setHttpResponseCode(200)
+                ->appendBody(json_encode(array('error' => $error, 'descError' => $mensaje)));
+        }
+    }
+
+    public function getdimensioncuatroAction(){//dir comercial ordenados por nombre ASC
+        if (!$this->acl->isAllowed($this->_oRolUsuario, 'apidimensiones', 'Ver recurso')) {
+            $this->getResponse()
+                ->setHttpResponseCode(200)
+                ->appendBody(json_encode(array('error' => -1, 'descError' => 'No tiene permiso para ver Dimensión cuatro')));
+
+        } else {
+
+            header('Content-type: application/json; charset=utf-8');
+
+            $mensaje = 'Dimension4 no localizado';
+            $error = -1;
+
+            $serviceDirComercial = new My_Service_Hiberus_Direccion();
+            $dirComercialesCollection = $serviceDirComercial->getDireccionesComercialesByIdsEmpresa([9], false);
+            $arrResponse = [];
+
+            if (!empty($dirComercialesCollection)) {
+                foreach ($dirComercialesCollection as $dirComercial) {
+                    if($dirComercial->getActivo() === "1") {
+                        $arrResponse[] = [
+                            'id' => $dirComercial->getId(),
+                            'nombre' => $dirComercial->getNombre(),
+                            'descripcion' => $dirComercial->getDescripcion(),
+                            'estado' => $dirComercial->getActivo()
+                        ];
+                    }
+                }
+
+                $mensaje = $arrResponse;
+                $error = 0;
+            }
+
+            $this->getResponse()
+                ->setHttpResponseCode(200)
+                ->appendBody(json_encode(array('error' => $error, 'descError' => $mensaje)));
+        }
+    }
+
+    public function getempresasAction(){//empresa ordenados por nombre ASC
+        if (!$this->acl->isAllowed($this->_oRolUsuario, 'apidimensiones', 'Ver recurso')) {
+            $this->getResponse()
+                ->setHttpResponseCode(200)
+                ->appendBody(json_encode(array('error' => -1, 'descError' => 'No tiene permiso para ver Dimensión cinco')));
+
+        } else {
+
+            header('Content-type: application/json; charset=utf-8');
+            $this->_idHiberusSistemas = 9;
+            $serviceEmpresa = new My_Service_Hiberus_Empresa();
+            $empresa = $serviceEmpresa->get($this->_idHiberusSistemas);
+            $arrResponse = [];
+
+            $arrResponse[] = [
+                'id' => $empresa->getId(),
+                'nombre' => $empresa->getNombre(),
+                'codAxapta' => $empresa->getIdAxapta(),
+                'estado' => $empresa->getActivo()
+            ];
+
+            $mensaje = $arrResponse;
+            $error = 0;
+
+            $this->getResponse()
+                ->setHttpResponseCode(200)
+                ->appendBody(json_encode(array('error' => $error, 'descError' => $mensaje)));
+        }
+    }
+
+    public function getdimensionseisAction(){//delegación ordenados por nombre ASC
+        if (!$this->acl->isAllowed($this->_oRolUsuario, 'apidimensiones', 'Ver recurso')) {
+            $this->getResponse()
+                ->setHttpResponseCode(200)
+                ->appendBody(json_encode(array('error' => -1, 'descError' => 'No tiene permiso para ver Dimensión seis')));
+
+        } else {
+
+            header('Content-type: application/json; charset=utf-8');
+
+            $mensaje = 'Dimension6 no localizado';
+            $error = -1;
+            $serviceDelegacion = new My_Service_Hiberus_Delegacion();
+            $delegacionesCollection = $serviceDelegacion->getDelegacionesbyIdsEmpresa([$this->_idHiberusSistemas], false);
+            $arrResponse = [];
+
+            if (!empty($delegacionesCollection)) {
+                foreach ($delegacionesCollection as $delegacion) {
+                    if($delegacion->getActivo() === "1") {
+                        $arrResponse[] = [
+                            'id' => $delegacion->getId(),
+                            'nombre' => $delegacion->getNombre(),
+                            'descripcion' => $delegacion->getDescripcion(),
+                            'estado' => $delegacion->getActivo()
+                        ];
+                    }
+                }
+
+                $mensaje = $arrResponse;
+                $error = 0;
+            }
+
+            $this->getResponse()
+                ->setHttpResponseCode(200)
+                ->appendBody(json_encode(array('error' => $error, 'descError' => $mensaje)));
+        }
+    }
+
+    public function getdimensionsieteAction(){//dimension7
+        if (!$this->acl->isAllowed($this->_oRolUsuario, 'apidimensiones', 'Ver recurso')) {
+            $this->getResponse()
+                ->setHttpResponseCode(200)
+                ->appendBody(json_encode(array('error' => -1, 'descError' => 'No tiene permiso para ver Dimensión siete')));
+
+        } else {
+
+            header('Content-type: application/json; charset=utf-8');
+
+            $mensaje = 'Dimension7 no localizado';
+            $error = -1;
+
+            $serviceDimensionSiete = new My_Service_Hiberus_Dimensionsiete();
+            $dimensionesSieteCollection = $serviceDimensionSiete->getDimensionessietebyIdsEmpresa([$this->_idHiberusSistemas], false);
+            $arrResponse = [];
+
+            if (!empty($dimensionesSieteCollection)) {
+                foreach ($dimensionesSieteCollection as $dimensionSiete) {
+                    if($dimensionSiete->getActivo() === "1") {
+                        $arrResponse[] = [
+                            'id' => $dimensionSiete->getId(),
+                            'nombre' => $dimensionSiete->getNombre(),
+                            'descricion' => $dimensionSiete->getDescripcion(),
+                            'estado' => $dimensionSiete->getActivo()
+                        ];
+                    }
+                }
+
+                $mensaje = $arrResponse;
+                $error = 0;
+            }
+
+            $this->getResponse()
+                ->setHttpResponseCode(200)
+                ->appendBody(json_encode(array('error' => $error, 'descError' => $mensaje)));
+        }
+    }
+    public function getdimensionochoAction(){//dimension8
+        if (!$this->acl->isAllowed($this->_oRolUsuario, 'apidimensiones', 'Ver recurso')) {
+            $this->getResponse()
+                ->setHttpResponseCode(200)
+                ->appendBody(json_encode(array('error' => -1, 'descError' => 'No tiene permiso para ver Dimensión ocho')));
+
+        } else {
+
+            header('Content-type: application/json; charset=utf-8');
+
+            $mensaje = 'Dimension8 no localizado';
+            $error = -1;
+
+            $serviceDimensionOcho = new My_Service_Hiberus_Dimensionocho();
+            $dimensionesOchoCollection = $serviceDimensionOcho->getDimensionesochobyIdsEmpresa([$this->_idHiberusSistemas], false);
+            $arrResponse = [];
+
+            if (!empty($dimensionesOchoCollection)) {
+                foreach ($dimensionesOchoCollection as $dimensionOcho) {
+                    if($dimensionOcho->getActivo() === "1") {
+                        $arrResponse[] = [
+                            'id' => $dimensionOcho->getId(),
+                            'nombre' => $dimensionOcho->getNombre(),
+                            'descricion' => $dimensionOcho->getDescripcion(),
+                            'estado' => $dimensionOcho->getActivo()
+                        ];
+                    }
+                }
+
+                $mensaje = $arrResponse;
+                $error = 0;
+            }
+
+            $this->getResponse()
+                ->setHttpResponseCode(200)
+                ->appendBody(json_encode(array('error' => $error, 'descError' => $mensaje)));
+        }
+    }
+
+    public function eliminarfacturabynumalbaranAction(){
+        //comprobar permisos
+        try{
+            if (!$this->acl->isAllowed($this->_oRolUsuario, 'apiFactura', 'Editar recurso')) {
+                $this->getResponse()
+                    ->setHttpResponseCode(200)
+                    ->appendBody(json_encode(array('error' => -1, 'descError' => 'No tiene permiso para crear proyectos')));
+            }
+
+            $serviceFactura = new My_Service_Economico_Factura();
+            $serviceEstados = new My_Service_General_Estado();
+            $facturaCollection = new My_Model_Hiberus_FacturaAteneaViewCollection();
+            $facturasActualizadas = $serviceFactura->getFacturasAtenea();
+
+            //Se reciben los parámetros y se procesan. Posteriormente se llaman a las funciones
+            if ($this->getRequest()->isPost()) {
+                $json = stripslashes(html_entity_decode($this->getRequest()->getRawBody()));
+                $params = json_decode(preg_replace('/[\x00-\x1F\x80-\xFF]/', '', $json), true);
+
+                try{
+                    My_App::getAdapter()->beginTransaction();
+
+                    $this->borrarFacturaConIncurrido($params["numeroAlbaran"]);
+
+                    My_App::getAdapter()->commit();
+                    $this->_helper->json(array('error' => 0, 'descError' => 'Se ha eliminado la factura de manera exitosa.'));
+                    exit;
+                }catch(Exception $e){
+                    My_App::getAdapter()->rollBack();
+                    $this->_helper->json(array('error' => -1, 'descError' => 'Error al eliminar la factura. Si este error persiste contacta con el servicio de soporte.'));
+                }
+
+            } else {
+                $this->getResponse()
+                    ->setHttpResponseCode(200)
+                    ->appendBody(json_encode(array('error' => -1, 'descError' => 'No es POST')));
+            }
+        }catch(Exception $e){
+            var_dump($e->getMessage());
+        }
+
+    }
+
+    private function borrarFacturaConIncurrido($numAlbaran){
+        $serviceFactura = new My_Service_Economico_Factura();
+        $serviceLineasFactura = new My_Service_Economico_LineasFactura();
+        $serviceIncurrido = new My_Service_Economico_Incurrido();
+        $serviceLineasIncurrido = new My_Service_Economico_LineasIncurrido();
+
+        $factura = $serviceFactura->getFacturaAtenea($numAlbaran);
+        if($factura->existInDB()){
+            //borrar incurrido y lineas incurrido
+            $incurrido = $serviceIncurrido->getIncurridoByProyectoAndDate($factura->getIdProyecto(), $factura->getAnyo(),$factura->getMes());
+            if ($incurrido->existInDB()){
+                $linIncurridoCollection = $serviceLineasIncurrido->getLineasByIncurrido($incurrido->getId());
+                //si hay lineas de incurrido se comprueba si el numero albaran coincide con el recibido.
+                if($linIncurridoCollection->count() > 0){
+                    foreach($linIncurridoCollection as $linIncurrido){
+                        //solo se elimina el incurrido del numero albaran recibido.
+                        if($linIncurrido->getNoAlbaran() == $numAlbaran){
+                            $serviceLineasIncurrido->delete($linIncurrido);
+                        }
+                    }
+                }
+            }
+
+            //borrar lineasfactura asociadas
+            $linfactExistentesCollection = $serviceLineasFactura->getLineasByFactura($factura->getId());
+            if($linfactExistentesCollection->count()>0){
+                foreach($linfactExistentesCollection as $linFactExistente){
+                    $serviceLineasFactura->delete($linFactExistente);
+                }
+            }
+
+            //borrar lineasfactura asociadas
+            $linfactExistentesCollection = $serviceLineasFactura->getLineasByFactura($factura->getId());
+            if($linfactExistentesCollection->count()>0){
+                foreach($linfactExistentesCollection as $linFactExistente){
+                    $serviceLineasFactura->delete($linFactExistente);
+                }
+            }
+
+            //borrar factura, el incurrido queda guardado
+            $serviceFactura->delete($factura, $this->_idJgimeno);
+
+            //comprobar si quedan lineas en el incurrido
+            $linIncurridoCollection = $serviceLineasIncurrido->getLineasByIncurrido($incurrido->getId());
+            $importeTotalInc = 0;
+            if($linIncurridoCollection->count() <= 0){
+                $serviceIncurrido->delete($incurrido, $this->_idJgimeno);
+            }else{
+                foreach($linIncurridoCollection as $linIncurrido){
+                    $importeTotalInc += $linIncurrido->getImporte();
+                }
+                $incurrido->setImporte($importeTotalInc);
+                $serviceIncurrido->saveModified($incurrido, $this->_idJgimeno, true);
+            }
+
+        }else{
+            $this->_helper->json(array('error' => -1, 'descError' => "No se ha encontrado la factura con el número de albarán $numAlbaran."));
+        }
+    }
+
+    public function actualizarestadofacturaAction(){
+        //comprobar permisos
+        try{
+            if (!$this->acl->isAllowed($this->_oRolUsuario, 'apiFactura', 'Ver recurso')) {
+                $this->getResponse()
+                    ->setHttpResponseCode(200)
+                    ->appendBody(json_encode(array('error' => -1, 'descError' => 'No tiene permiso para crear proyectos')));
+            }
+
+            $serviceFactura = new My_Service_Economico_Factura();
+            $serviceEstados = new My_Service_General_Estado();
+            $facturaCollection = new My_Model_Hiberus_FacturaAteneaViewCollection();
+            $facturasActualizadas = $serviceFactura->getFacturasAtenea();
+
+            $arrJson = array ();
+            if(is_countable($facturasActualizadas)){
+                foreach($facturasActualizadas as $factura){
+                    $nombreEstado = $serviceEstados->getDescEstado($serviceFactura->getOrigenEstado(),$factura->getFkIdEstado());
+                    $numeroFactura = $factura->getNumeroFactura();
+                    $arrJson[] = [
+                        "numeroAlbaran" => $factura->getNoAlbaran(),
+                        "estado" => $factura->getFkIdEstado(),
+                        "nombreEstado" => $nombreEstado,
+                        "numeroFactura" =>$numeroFactura
+                    ];
+                }
+            }
+
+            $this->_helper->json(array('error' => 0, 'descError' => $arrJson));
+        }catch(Exception $e){
+            var_dump($e);
+        }
+    }
+
+    public function setproyectofacturaAction()
+    {
+        error_reporting(E_ALL & ~E_NOTICE & ~E_DEPRECATED);
+        //comprobar permisos
+        if (!$this->acl->isAllowed($this->_oRolUsuario, 'apiProyecto', 'Editar recurso')) {
+            $this->getResponse()
+                ->setHttpResponseCode(200)
+                ->appendBody(json_encode(array('error' => -1, 'descError' => 'No tiene permiso para crear proyectos')));
+        }
+
+
+        //Se reciben los parámetros y se procesan. Posteriormente se llaman a las funciones
+        if ($this->getRequest()->isPost()) {
+            $json = stripslashes(html_entity_decode($this->getRequest()->getRawBody()));
+            $params = json_decode(preg_replace('/[\x00-\x1F\x80-\xFF]/', '', $json), true);
+
+            try{
+                My_App::getAdapter()->beginTransaction();
+                $this->_crearProyecto($params);
+
+                if(!empty($params["detallesFactura"][0])){
+                    $this->_crearFacturaConLineas($params);
+                    My_App::getAdapter()->commit();
+                    $this->_helper->json(array('error' => 0, 'descError' => 'Se ha añadido el proyecto y sus correspondientes facturas de manera exitosa.'));
+                    exit;
+                }
+                My_App::getAdapter()->commit();
+                $this->_helper->json(array('error' => 0, 'descError' => 'Se ha añadido el proyecto de manera exitosa.'));
+                exit;
+            }catch(Exception $e){
+                My_App::getAdapter()->rollBack();
+                $this->_helper->json(array('error' => -1, 'descError' => 'Error al guardar grupo cliente. Por favor recarga la página. Si este error persiste contacta con el servicio de soporte.'));
+            }
+
+        } else {
+            $this->getResponse()
+                ->setHttpResponseCode(200)
+                ->appendBody(json_encode(array('error' => -1, 'descError' => 'No es POST')));
+        }
+    }
+
+    //esta función solo sirve para atenea
+    private function _crearProyecto($params)
+    {
+        $serviceProyecto = new My_Service_Proyecto_Proyecto();
+        $serviceTercero = new My_Service_Tercero_Tercero();
+        $serviceEmpresa = new My_Service_Hiberus_Empresa();
+        $serviceUsuario = new My_Service_Acceso_Usuario();
+        $serviceCondicionesPago = new My_Service_Tercero_Condicionespago();
+        $serviceCliente = new My_Service_Tercero_Tercero();
+        $serviceGrupoCliente = new My_Service_Tercero_Grupo();
+        $acl = $this->acl;
+        $proyectoAceptado = 30;
+        $tipoClienteFinal = 1;
+
+        //Documento vacío
+        $proyecto = $serviceProyecto->get();
+        $proyecto->setNombreProyecto("Venta Atenea " . $params['nombreCliente']);
+        $proyecto->setDescripcionProyecto("Venta Atenea " . $params['nombreCliente']);
+        $proyecto->setFkidCliente($params['idClienteUnhiberse']);
+        $proyecto->setFkidOrigen($serviceProyecto->getOrigenEstado());
+        $proyecto->setFkidEstado($proyectoAceptado);
+        $proyecto->setFkidTipoAct($tipoClienteFinal);
+        $proyecto->setFkidZonaTer($params['dimensionUno']);
+        $proyecto->setFkIdEmpresa($this->_idHiberusSistemas);
+        $proyecto->setProbExito("");
+
+        if (intval($params['idClienteUnhiberse']) > 0) {
+            $tercero = $serviceTercero->get($params['idClienteUnhiberse']);
+            $idTercero = $tercero->getId();
+            //si el id recibido no existe se muestra mensaje de error
+            !isset($idTercero) && $this->_helper->json(array('error' => -1, 'descError' => 'El cliente no existe. Prueba a sincronizar de nuevo con unhiberse.'));
+
+            //si el id recibido no existe se muestra mensaje de error. Si no es igual el nombre se pide sincronizar de nuevo para asegurar resultados.
+            if($tercero->getNombre() != $params['nombreCliente']){
+                My_App::getAdapter()->rollBack();
+                $this->_helper->json(array('error' => -1, 'descError' => 'El nombre del cliente no corresponde al nombre en unhiberse. Prueba a sincronizar de nuevo con unhiberse.'));
+            }
+
+            //Obtener terceros, tambien llamados clientes, de sistemas
+            $serviceTercero = new My_Service_Tercero_Tercero();
+            $ID_SISTEMAS = 9;
+            //obtener empresas de sistemas
+            $tercerosSis = $serviceTercero->getTerceroBuscador(
+                null,
+                null,
+                "1",
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                [$ID_SISTEMAS],
+                false,
+                false,
+                false
+            );
+            $permisoTercero = false;
+
+            foreach ($tercerosSis as $terceroSis) {
+                if ($params["idClienteUnhiberse"] === $terceroSis->getId()) {
+                    $permisoTercero = true;
+                    break;
+                }
+            }
+
+            $tercero->setEmpresas($serviceEmpresa->getEmpresasByTercero($tercero->getId()));
+
+            //Si no tiene permiso para seleccionar ese cliente se comprueba si el CIF es correcto y se añade el cliente a la empresa automáticamente.
+            $CIFcorrecto = isset($params["CIF"]) && $params["CIF"] != "";
+            $getTerceroByCIFcorrecto = $serviceTercero->getTerceroByCif($params["CIF"])!=null && $serviceTercero->getTerceroByCif($params["CIF"]) != "";
+
+            if (!$permisoTercero) {
+                if($CIFcorrecto && $getTerceroByCIFcorrecto){
+                    $empresa = $serviceEmpresa->get($this->_idHiberusSistemas);
+                    $tercero->addEmpresa($empresa);
+                }
+                else{
+                    My_App::getAdapter()->rollBack();
+                    $this->_helper->json(array('error' => -1, 'descError' => 'No tiene permiso para seleccionar ese cliente'));
+                }
+            }
+
+            if (!in_array($proyecto->getFkIdEmpresa(), $tercero->getEmpresas()->getAllIds())) {
+                My_App::getAdapter()->rollBack();
+                $this->_helper->json(array('error' => -1, 'descError' => 'El cliente seleccionado no esta asociado a la empresa del proyecto y el CIF recibido es incorrecto. Vuelve a sincronizar con unhiberse.'));
+            }
+
+            $facturacionHitos = "1";
+            $proyecto->setCodigoCrm($params['codigoCrm'] ?? "");
+            $proyecto->setFkidComercial($params['dimensionTres']);
+            $proyecto->setFkidUnidad($params['dimensionDos']);
+            $proyecto->setFkidDireccion($params['dimensionCuatro']);
+            $proyecto->setFkidDelegacion($params['dimensionSeis']);
+            $proyecto->setFkidDimensionsiete($params['dimensionSiete']);
+            $proyecto->setFkidDimensionocho($params['dimensionOcho']);
+            $proyecto->setIdFacturacion($facturacionHitos);
+            $proyecto->setIdTipoProyecto(null);
+            $serviceProyecto->validarDimensiones($proyecto);
+
+
+            $idUsuario = $this->_idJgimeno;
+
+            // Usuario de contacto obligatorio para proyectos aceptados
+            $usuario = $serviceUsuario->get($idUsuario);
+            if ($idUsuario != 0 && !$usuario->existInDB()) {
+                My_App::getAdapter()->rollBack();
+                $this->_helper->json(array('error' => -1, 'descError' => 'Responsable de facturación no válido'));
+            } else if ($idUsuario != 0) {
+                $proyecto->setIdContactoHiberus($idUsuario);
+            }
+
+            $proyecto->setEmailContacto($usuario->getEmail());
+            if (trim($proyecto->getEmailContacto()) != '' && !filter_var(trim($proyecto->getEmailContacto()), FILTER_VALIDATE_EMAIL)) {
+                My_App::getAdapter()->rollBack();
+                $this->_helper->json(array('error' => -1, 'descError' => 'Email de responsable de facturación no válido'));
+            }
+
+            $proyecto->setEmailEnvioFacturas($usuario->getEmail());
+            if (trim($proyecto->getEmailEnvioFacturas()) != '' && !filter_var(trim($proyecto->getEmailEnvioFacturas()), FILTER_VALIDATE_EMAIL)) {
+                My_App::getAdapter()->rollBack();
+                $this->_helper->json(array('error' => -1, 'descError' => 'Email de envío de facturas no válido'));
+            }
+
+            $proyecto->setEmailEnvioFacturas($usuario->getEmail());
+
+            try{
+                $clienteAsociado = $params['idClienteUnhiberse'];
+                $codigoProyectoAsociado = $params["detallesFactura"][0]["numPedido"] ?? null;
+                $proyectoAsociado = isset($codigoProyectoAsociado) ? $serviceProyecto->getProyectoByIdString($codigoProyectoAsociado) : null;
+
+                if(isset($clienteAsociado)){
+                    $tieneEmpresasAX =  $this->comprobarSiHayEmpresasAsociadas($clienteAsociado);
+
+                    if ($tieneEmpresasAX) {
+                        //comprobar que los parámetros recibidos son correctos.
+                        if(!isset($codigoProyectoAsociado)){
+                            My_App::getAdapter()->rollBack();
+                            $this->_helper->json(array('error' => -1, 'descError' => 'El numPedido no puede estar vacío.'));
+                        }
+                        if(!isset($proyectoAsociado)){
+                            My_App::getAdapter()->rollBack();
+                            $this->_helper->json(array('error' => -1, 'descError' => 'El numPedido no corresponde a ningún proyecto.'));
+                        }
+
+                        $proyecto = $this->comprobarCodigoProyecto($codigoProyectoAsociado, $clienteAsociado, $proyecto);
+
+                        $clienteProyectoAsociado = $proyectoAsociado->getFkidCliente() ?? $proyectoAsociado->getFkidProyecto();
+                        if(!isset($clienteProyectoAsociado)){
+                            My_App::getAdapter()->rollBack();
+                            $this->_helper->json(array('error' => -1, 'descError' => 'Error al obtener el cliente asociado al numPedido. Prueba a sincronizar de nuevo con unhiberse.'));
+                        }
+
+                        $arrGrupos = $this->getGrupoCliente($tipoClienteFinal, $proyectoAsociado->getId(), $clienteProyectoAsociado);
+                        $grupoCliente = $arrGrupos["grupoSelected"];
+
+                        if ($grupoCliente === "fkIdCliente" || $grupoCliente === "") {
+                            $proyecto = $this->comprobacionesActividadClienteFinal($proyecto, $params["nombreCliente"], $params["codigoProyectoAsociado"], $clienteAsociado);
+                        }else{
+                            $proyecto->setFkIdGrupoCliente($grupoCliente);
+                        }
+                    }else{
+                        $grupoCliente = $serviceGrupoCliente->getIdGrupoByTercero($clienteAsociado);
+                        $proyecto->setFkIdGrupoCliente($grupoCliente);
+                    }
+                } else {
+                    My_App::getAdapter()->rollBack();
+                    $this->_helper->json(array('error' => -1, 'descError' => 'Es necesario enviar el id del cliente asociado'));
+                }
+            } catch (Exception $e) {
+                My_App::getAdapter()->rollBack();
+                $this->_helper->json(array('error' => -1, 'descError' => 'Error al guardar grupo cliente. Por favor recarga la página. Si este error persiste contacta con el servicio de soporte.'));
+            }
+
+
+            if ($proyecto->getfkidEstado() >= $serviceProyecto->getEstadoAceptado() && ($idUsuario == 0 || trim($proyecto->getEmailContacto()) == '')) {
+                My_App::getAdapter()->rollBack();
+                $this->_helper->json(array('error' => -1, 'descError' => 'El responsable de facturación y su email es obligatorio para proyectos aceptados'));
+            }
+
+            $idCondicionPago = intval($params["idClienteUnhiberse"]);
+            if ($idCondicionPago > 0) {
+                $condicion = $serviceCondicionesPago->getByTercero($idCondicionPago,1);
+                if (!$condicion->existInDB() || $condicion->getIdTercero() != $params['idClienteUnhiberse']) {
+                    My_App::getAdapter()->rollBack();
+                    $this->_helper->json(array('error' => -1, 'descError' => 'La condicion de pago no pertenece al cliente indicado'));
+                    exit;
+                } else if ($condicion->getPermisoEspecialService() && !$acl->isAllowed($this->_oRolUsuario, 'condicionesEspeciales', 'Ver recurso')) {
+                    My_App::getAdapter()->rollBack();
+                    $this->_helper->json(array('error' => -1, 'descError' => 'La condicion de pago seleccionada no está permitida'));
+                    exit;
+                }
+                $proyecto->setIdCondicionesPago($idCondicionPago);
+            }
+            $esProyecto = $proyecto->esProyecto();
+            $proyecto->setImporteProyecto(null);
+            $proyecto->setImporteEnCurso(null);
+
+            $proyecto->setFechaCreacion(date('Y-m-d h:i:s'));
+
+            $idCliente = intval($params['idClienteUnhiberse']);
+            $camposFaltan = '';
+            $esInterno = true;
+
+
+            // Cliente puede ser idProyecto padre
+            if ($proyecto->getFkidTipoAct() == 1) {
+                if ($proyecto->getIdFacturacion() == null && ($proyecto->getFkidEstado() >= $serviceProyecto->getEstadoAceptado())) {
+                    My_App::getAdapter()->rollBack();
+                    $this->_helper->json(array('error' => -1, 'descError' => 'Indique un tipo de facturación'));
+                }
+
+                error_reporting(E_ERROR | E_WARNING | E_PARSE);
+
+                $idCliente = intval($params['idClienteUnhiberse']);
+                $clienteEntity = $serviceCliente->get($idCliente);
+                $nif = trim($clienteEntity->getCif());
+                $razonSocial = iconv("UTF-8", "ISO-8859-1", trim($clienteEntity->getRazonSocial()));
+                $dirFiscal = iconv("UTF-8", "ISO-8859-1", trim($clienteEntity->getDireccionFiscal()));
+                $cpFiscal = iconv("UTF-8", "ISO-8859-1", trim($clienteEntity->getCpFiscal()));
+                $dirEnvio = iconv("UTF-8", "ISO-8859-1", trim($clienteEntity->getDireccionEnvio()));
+                $cpEnvio = iconv("UTF-8", "ISO-8859-1", trim($clienteEntity->getCpEnvio()));
+                $esInterno = $clienteEntity->getEsInterno();
+                $esGrupo = $clienteEntity->getEsGrupo() ?? null;
+                $camposFaltan = '';
+                $camposFaltan .= ($esGrupo === NULL) ? 'Grupo empresa | ' : '';
+                $camposFaltan .= ($clienteEntity->getIdGrupoCliente() == null) ? ' Grupo Cliente |' : '';
+                $camposFaltan .= empty($nif) ? ' CIF | ' : '';
+                $camposFaltan .= empty($razonSocial) ? ' Razón Social | ' : '';
+                $camposFaltan .= empty($dirFiscal) ? ' Dirección Fiscal | ' : '';
+                $camposFaltan .= empty($cpFiscal) ? ' Código Postal (Dirección Fiscal) | ' : '';
+                $camposFaltan .= empty($dirEnvio) ? ' Dirección Envío | ' : '';
+                $camposFaltan .= empty($cpEnvio) ? ' Código Postal (Dirección Envío) | ' : '';
+
+                $serviceCondiones = new My_Service_Tercero_Condicionespago();
+                $condiciones = $serviceCondiones->getCondicionesByTercero($clienteEntity->getId());
+                $numCondiciones = $condiciones->count();
+                $camposFaltan .= ($numCondiciones == 0) ? ' Condiciones de pago ' : '';
+                // Comprobamos que la condición de pago 1 está completa
+                if ($numCondiciones > 0) {
+                    $idCliente = $proyecto->getFkidCliente();
+                    $condicion = $serviceCondicionesPago->getByTercero($idCliente, 1);
+                    $esCompleta = $this->validarCondicionCompleta($condicion);
+                    // Indicamos que no hay condición de pago por defecto válida
+                    $numCondiciones = (!$esCompleta) ? 0 : $numCondiciones;
+                    $camposFaltan .= ($numCondiciones == 0) ? ' Condiciones de pago ' : '';
+                }
+            }
+
+
+            if ((((empty($nif)) || (empty($razonSocial)) || (empty($dirFiscal)) || (empty($cpFiscal)) || ($numCondiciones == 0) || ($clienteEntity->getIdGrupoCliente() == null) || ($esGrupo === NULL)) && ((!($esProyecto)) && (!($esInterno))))) {
+                $proyecto->setFkidEstado($serviceProyecto->getEstadoPendiente());
+                My_App::getAdapter()->rollBack();
+                if (empty($nif)) {
+                    $this->_helper->json(array('error' => -1, 'descError' => "'nif' is empty."));
+                }
+                if (empty($razonSocial)) {
+                    $this->_helper->json(array('error' => -1, 'descError' => "'razonSocial' is empty."));
+                }
+                if (empty($dirFiscal)) {
+                    $this->_helper->json(array('error' => -1, 'descError' => "'dirFiscal' is empty."));
+                }
+                if (empty($cpFiscal)) {
+                    $this->_helper->json(array('error' => -1, 'descError' => "'cpFiscal' is empty."));
+                }
+                if ($numCondiciones == 0) {
+                    $this->_helper->json(array('error' => -1, 'descError' => 'El cliente no tiene condiciones asociadas.'));
+                }
+                if ($clienteEntity->getIdGrupoCliente() == null) {
+                    $this->_helper->json(array('error' => -1, 'descError' => "'getIdGrupoCliente()' returns null."));
+                }
+                if ($esGrupo === NULL) {
+                    $this->_helper->json(array('error' => -1, 'descError' => "'esGrupo' is null."));
+                }
+                if ((!($esProyecto)) && (!($esInterno))) {
+                    $this->_helper->json(array('error' => -1, 'descError' => "'esProyecto' and 'esInterno' are false."));
+                }
+
+                $arrTercero['data'] = $idCliente;
+                $arrTercero['error'] = -1;
+                $arrTercero['campos'] = $camposFaltan;
+                $arrTercero['idProyecto'] = $params["codigoPresupuesto"];
+                $this->_helper->json(array('error' => -1, 'descError' => 'Error en el cliente.'));
+                exit;
+            }
+            if (!($esInterno)) {
+                $idCliente = $proyecto->getFkidCliente();
+                $condicion = $serviceCondicionesPago->getByTercero($idCliente, 1);
+
+                if (!$condicion->existInDB()) {
+                    My_App::getAdapter()->rollBack();
+                    $this->_helper->json(array('error' => -1, 'descError' => 'No existe condición de pago'));
+                }
+                $proyecto->setIdCondicionesPago($condicion->getId());
+            }
+
+            try{
+
+                //comprobar que el formato del código de presupuesto es correcto
+                $partesCodigoPresupuesto = explode("/", $params["codigoPresupuesto"]);
+
+                if (is_countable($partesCodigoPresupuesto) && (count($partesCodigoPresupuesto) != 2)) {
+                    // Si no hay exactamente dos partes, entonces no es una entrada válida
+                    My_App::getAdapter()->rollBack();
+                    $this->_helper->json(array('error' => -1, 'descError' => 'El formato del código presupuesto es incorrecto.'));
+                } else {
+                    $second_part = $partesCodigoPresupuesto[1];
+                    if (!is_numeric($second_part)) {
+                        My_App::getAdapter()->rollBack();
+                        $this->_helper->json(array('error' => -1, 'descError' => 'El formato del código presupuesto es incorrecto.'));
+                    }
+                }
+
+                //comprobar si existe el proyecto
+                $proyectoExistente = $serviceProyecto->getProyectoByIdString($params["codigoPresupuesto"]);
+                $existeProyecto = $proyectoExistente->getId() !== null;
+
+                //si no existe se hace el guardado
+                if(!$existeProyecto){
+                    //primero se guarda normal y luego se modifica el id porque al guardar normal se formatea de la forma año-id (xxxx-xxxx)
+                    //y para cambiarlo decidimos hacer saveModified porque es lo más facil
+                    $id = $serviceProyecto->save($proyecto, true);
+                    $proyecto->setIdProyecto($params["codigoPresupuesto"]);
+                    $proyecto->setCodigoAtenea($params["codigoPresupuesto"]);
+                    $result = $serviceProyecto->saveModified($proyecto, true);
+                }else{
+                    //Por ahora se sobreescribe si el proyecto existe
+                    $id = $proyectoExistente->getId();
+                    $proyecto->setIdProyecto($params["codigoPresupuesto"]);
+                    $proyecto->setCodigoAtenea($params["codigoPresupuesto"]);
+                    $result = $serviceProyecto->saveModified($proyecto, true);
+                }
+
+            }catch(Exception $e){
+                My_App::getAdapter()->rollBack();
+                $this->_helper->json(array('error' => -1, 'descError' => 'Error al guardar el proyecto'));
+            }
+
+            if (isset($id)&&($id > 0) && (!($esProyecto)) && (!($esInterno))) {
+                $Utils = new My_Utils();
+                $address = !in_array($_SESSION['entorno']['tipo'], array('local', 'pre')) ? "unhiberse@hiberus.com" : $_SESSION['entorno']['mail'];
+                $subject = "Nuevo proyecto aceptado Unhiberse";
+                $zona = iconv("UTF-8", "ISO-8859-1", $proyecto->getNombreZona());
+                $unidadGestion = $proyecto->getNombreUnidad();
+                $delegacion = iconv("UTF-8", "ISO-8859-1", $proyecto->getNombreDelegacion());
+                $dimensionsiete = iconv("UTF-8", "ISO-8859-1", $proyecto->getNombreDimensionsiete());
+                $dimensionocho = iconv("UTF-8", "ISO-8859-1", $proyecto->getNombreDimensionocho());
+                $respComercial = $proyecto->getNombreComercial();
+                $dirComercial = $proyecto->getNombreDireccion();
+                $empresa = iconv("UTF-8", "ISO-8859-1", $proyecto->getNombreEmpresa());
+
+
+                $bodyHtml = '<html>
+						                        <body style="font-size:15px; font-family:Tahoma; color:#393939;">
+													<strong style="color:#3087B8;">Proyecto aceptado: </strong><hr>
+													<div>
+														<div><b>' . iconv("UTF-8", "ISO-8859-1", "Código proyecto") . ':  </b>' . $id . '</div>
+														<div><b>' . iconv("UTF-8", "ISO-8859-1", "Descripción") . ': </b>' . iconv("UTF-8", "ISO-8859-1", "Venta Atenea " . $params['nombreCliente']) . '</div>
+														<div><b>' . iconv("UTF-8", "ISO-8859-1", My_Model_Hiberus_ZonaEntity::NOMBRE_DIMENSION) . ':  </b>' . iconv("UTF-8", "ISO-8859-1", $zona) . '</div>
+														<div><b>' . iconv("UTF-8", "ISO-8859-1", My_Model_Hiberus_UnidadEntity::NOMBRE_DIMENSION) . ':  </b>' . iconv("UTF-8", "ISO-8859-1", $unidadGestion) . '</div>
+														<div><b>' . iconv("UTF-8", "ISO-8859-1", My_Model_Hiberus_DelegacionEntity::NOMBRE_DIMENSION) . ':  </b>' . iconv("UTF-8", "ISO-8859-1", $delegacion) . '</div>
+														<div><b>' . iconv("UTF-8", "ISO-8859-1", My_Model_Hiberus_DimensionsieteEntity::NOMBRE_DIMENSION) . ':  </b>' . iconv("UTF-8", "ISO-8859-1", $dimensionsiete) . '</div>
+														<div><b>' . iconv("UTF-8", "ISO-8859-1", My_Model_Hiberus_DimensionochoEntity::NOMBRE_DIMENSION) . ':  </b>' . iconv("UTF-8", "ISO-8859-1", $dimensionocho) . '</div>
+														<div><b>' . iconv("UTF-8", "ISO-8859-1", My_Model_Hiberus_ComercialEntity::NOMBRE_DIMENSION) . ':  </b>' . iconv("UTF-8", "ISO-8859-1", $respComercial) . '</div>
+														<div><b>' . iconv("UTF-8", "ISO-8859-1", My_Model_Hiberus_DireccionEntity::NOMBRE_DIMENSION) . ':  </b>' . iconv("UTF-8", "ISO-8859-1", $dirComercial) . '</div>
+														<div><b>Empresa:  </b>' . $empresa . '</div><br><br>';
+
+                $bodyHtml .= '</div>
+													<strong style="color:#3087B8;">Cliente: </strong><hr>
+													<div>
+														<div><b>CIF:  </b>' . $nif . '</div>
+														<div><b>' . iconv("UTF-8", "ISO-8859-1", "Razón social") . ':  </b>' . iconv("UTF-8", "ISO-8859-1", $razonSocial) . '</div>
+														<div><b>' . iconv("UTF-8", "ISO-8859-1", "Dirección Fiscal") . ':  </b>' . iconv("UTF-8", "ISO-8859-1", $dirFiscal) . '</div>
+														<div><b>' . iconv("UTF-8", "ISO-8859-1", "Código Postal") . ':  </b>' . iconv("UTF-8", "ISO-8859-1", $cpFiscal) . '</div>
+														<div><b>' . iconv("UTF-8", "ISO-8859-1", "Dirección Envio") . ':  </b>' . iconv("UTF-8", "ISO-8859-1", $dirEnvio) . '</div>
+														<div><b>' . iconv("UTF-8", "ISO-8859-1", "Código Postal") . ':  </b>' . iconv("UTF-8", "ISO-8859-1", $cpEnvio) . '</div><br><br>
+													</div>';
+
+
+                $infoCondiciones = '';
+                $serviceCondicionesPago = new My_Service_Tercero_Condicionespago();
+                if (intval($proyecto->getIdCondicionesPago()) > 0) {
+                    $condiciones = $serviceCondicionesPago->get(intval($proyecto->getIdCondicionesPago()));
+
+                    $idCondicion = $condiciones->getIdCondicionPago();
+                    $alias = $condiciones->getAlias();
+                    $contTecnico = $condiciones->getContactoTecnico();
+                    $emailTecnico = $condiciones->getEmailTecnico();
+                    $telfTecnico = $condiciones->getTelefonoTecnico();
+                    $contFacturacion = $condiciones->getContactoFacturacion();
+                    $emailFacturacion = $condiciones->getEmailFacturacion();
+                    $telfFacturacion = $condiciones->getTelefonoFacturacion();
+                    $formaPago = $condiciones->getNombreFormaPago();
+                    $iban = $condiciones->getIBAN();
+                    $tiempoPago = $condiciones->getNombreTiempoPago();
+                    $divisa = $condiciones->getNombreDivisa();
+                    $face = $condiciones->getFace();
+                    $organoGestor = $condiciones->getOrganoGestor();
+                    $unidadTramitadora = $condiciones->getUnidadTramitadora();
+                    $oficinaContable = $condiciones->getOficinaContable();
+                    $numeroExpediente = !empty($condiciones->getNumeroExpediente()) ? $condiciones->getNumeroExpediente() : null;
+
+                    $bodyHtml .= '<strong style="color:#3087B8;">Condiciones de pago: </strong><hr>
+													<div>
+														<div><b>ID condiciones de pago (ID Cliente AX):  </b>' . $idCondicion . '</div>
+														<div><b>Alias condiciones de pago:  </b>' . iconv("UTF-8", "ISO-8859-1", $alias) . '</div>
+														<div><b>' . iconv("UTF-8", "ISO-8859-1", "Contacto técnico") . ':  </b>' . iconv("UTF-8", "ISO-8859-1", $contTecnico) . '</div>
+														<div><b>' . iconv("UTF-8", "ISO-8859-1", "Email tecnico") . ':  </b>' . $emailTecnico . '</div>
+														<div><b>' . iconv("UTF-8", "ISO-8859-1", "Teléfono técnico") . ':  </b>' . $telfTecnico . '</div>
+														<div><b>' . iconv("UTF-8", "ISO-8859-1", "Contacto facturación") . ':  </b>' . iconv("UTF-8", "ISO-8859-1", $contFacturacion) . '</div>
+														<div><b>' . iconv("UTF-8", "ISO-8859-1", "Email facturación") . ':  </b>' . $emailFacturacion . '</div>
+														<div><b>' . iconv("UTF-8", "ISO-8859-1", "Teléfono facturación") . ':  </b>' . $telfFacturacion . '</div>
+														<div><b>Forma de pago:  </b>' . iconv("UTF-8", "ISO-8859-1", $formaPago) . '</div>
+														<div><b>IBAN:  </b>' . $iban . '</div>
+														<div><b>Tiempo de pago:  </b>' . iconv("UTF-8", "ISO-8859-1", $tiempoPago) . '</div>
+														<div><b>Divisa:  </b>' . $divisa . '</div>';
+
+                    if ($face) {
+                        $bodyHtml .= '<div><b>FACE:  </b>' . iconv("UTF-8", "ISO-8859-1", "Sí") . '</div>';
+                        $bodyHtml .= '<div><b>' . iconv("UTF-8", "ISO-8859-1", "Órgano gestor") . ':  </b>' . $organoGestor . '</div>';
+                        $bodyHtml .= '<div><b>Unidad tramitadora:  </b>' . $unidadTramitadora . '</div>';
+                        $bodyHtml .= '<div><b>Oficina contable:  </b>' . $oficinaContable . '</div>';
+                        // Número de expediente es opcional
+                        $bodyHtml .= ($numeroExpediente != null) ? '<div><b>' . iconv("UTF-8", "ISO-8859-1", "Nº de expediente/código de asignación") . ':  </b>' . $numeroExpediente . '</div>' : '';
+                    }
+
+                    $bodyHtml .= '</div>';
+
+                    $infoCondiciones = " | Id condiciones de pago: " . $idCondicion .
+                        " | Alias condiciones de pago: " . iconv("UTF-8", "ISO-8859-1", $alias) .
+                        " | " . iconv("UTF-8", "ISO-8859-1", "Contacto técnico") . ": " . iconv("UTF-8", "ISO-8859-1", $contTecnico) .
+                        " | " . iconv("UTF-8", "ISO-8859-1", "Email técnico") . ": " . $emailTecnico .
+                        " | " . iconv("UTF-8", "ISO-8859-1", "Teléfono técnico") . ": " . $telfTecnico .
+                        " | " . iconv("UTF-8", "ISO-8859-1", "Contacto facturación") . ": " . iconv("UTF-8", "ISO-8859-1", $contFacturacion) .
+                        " | " . iconv("UTF-8", "ISO-8859-1", "Email facturación") . ": " . $emailFacturacion .
+                        " | " . iconv("UTF-8", "ISO-8859-1", "Teléfono facturación") . ": " . $telfFacturacion .
+                        " | Forma de pago: " . iconv("UTF-8", "ISO-8859-1", $formaPago) .
+                        " | IBAN: " . $iban .
+                        " | Tiempo de pago: " . iconv("UTF-8", "ISO-8859-1", $tiempoPago) . " | Divisa: " . $divisa;
+                }
+
+                $bodyHtml .= '</html>';
+
+
+                $altBody = "Proyecto aceptado: | Codigo proyecto: " . $id .
+                    " | " . iconv("UTF-8", "ISO-8859-1", "Descripción") . ": " . iconv("UTF-8", "ISO-8859-1", "Venta Atenea " . $params['nombreCliente']) .
+                    " | " . iconv("UTF-8", "ISO-8859-1", My_Model_Hiberus_ZonaEntity::NOMBRE_DIMENSION) . ": " . iconv("UTF-8", "ISO-8859-1", $zona) .
+                    " | " . iconv("UTF-8", "ISO-8859-1", My_Model_Hiberus_UnidadEntity::NOMBRE_DIMENSION) . ": " . iconv("UTF-8", "ISO-8859-1", $unidadGestion) .
+                    " | " . iconv("UTF-8", "ISO-8859-1", My_Model_Hiberus_DelegacionEntity::NOMBRE_DIMENSION) . ": " . iconv("UTF-8", "ISO-8859-1", $delegacion) .
+                    " | " . iconv("UTF-8", "ISO-8859-1", My_Model_Hiberus_DimensionsieteEntity::NOMBRE_DIMENSION) . ": " . iconv("UTF-8", "ISO-8859-1", $dimensionsiete) .
+                    " | " . iconv("UTF-8", "ISO-8859-1", My_Model_Hiberus_DimensionochoEntity::NOMBRE_DIMENSION) . ": " . iconv("UTF-8", "ISO-8859-1", $dimensionocho) .
+                    " | " . iconv("UTF-8", "ISO-8859-1", My_Model_Hiberus_ComercialEntity::NOMBRE_DIMENSION) . ": " . iconv("UTF-8", "ISO-8859-1//IGNORE//TRANSLIT", $respComercial) .
+                    " | " . iconv("UTF-8", "ISO-8859-1", My_Model_Hiberus_DireccionEntity::NOMBRE_DIMENSION) . ": " . iconv("UTF-8", "ISO-8859-1", $dirComercial) .
+                    " | Empresa: " . iconv("UTF-8", "ISO-8859-1", $empresa) . " | Cliente: ID: " . $idCliente . " | CIF: " . $nif .
+                    " | " . iconv("UTF-8", "ISO-8859-1", "Razon social") . ": " . iconv("UTF-8", "ISO-8859-1", $razonSocial) .
+                    " | " . iconv("UTF-8", "ISO-8859-1", "Dirección Fiscal") . ": " . iconv("UTF-8", "ISO-8859-1", $dirFiscal) .
+                    " | " . iconv("UTF-8", "ISO-8859-1", "Código Postal") . ": " . $cpFiscal .
+                    " | " . iconv("UTF-8", "ISO-8859-1", "Dirección Envío") . ": " . iconv("UTF-8", "ISO-8859-1", $dirEnvio) .
+                    " | " . iconv("UTF-8", "ISO-8859-1", "Código Postal") . ": " . $cpEnvio . $infoCondiciones;
+
+
+                $envio = $Utils::enviarEmail($address, $subject, $bodyHtml, $altBody);
+
+                $serviceFichero = new My_Service_Fichero_Fichero();
+                $serviceCategoria = new My_Service_Fichero_Categoria();
+                $ficheros = $serviceFichero->getFicheros($proyecto->getId(), $serviceProyecto->getOrigenEstado(), $serviceCategoria->getIdCategoriaContrato(), null);
+                if ($ficheros->count() == 0) {
+                    $this->enviarMailAceptadoSinContrato($proyecto->getIdProyecto(), $proyecto->getNombre());
+                }
+            }
+        }
+    }
+    //esta función solo sirve para atenea
+    private function _crearFacturaConLineas($params)
+    {
+        set_time_limit(0);
+        ini_set('memory_limit', '-1');
+        try {
+            $acl = Zend_Registry::getInstance()->Acl;
+            $this->_helper->layout()->disableLayout();
+            $utils = new My_Utils();
+            $serviceFactura = new My_Service_Economico_Factura();
+            $serviceLineasFactura = new My_Service_Economico_LineasFactura();
+            $serviceFichero = new My_Service_Fichero_Fichero();
+            $serviceProyecto = new My_Service_Proyecto_Proyecto();
+            $servicePeriodo = new My_Service_Economico_Periodo();
+
+            /* Entre otras cosas, llega este objeto con información relativa a facturas. ("var_dump($params);" para más info)
+
+             "detallesFactura": [
+                {
+                "codigoArticulo": "PORTES",
+                "unidades": 1.0,
+                "importeUnitario": 0.00,
+                "concepto": "PORTES Nº Alb: 20991",
+                "numPedido": null,
+                "fechaFactura": "2023-02-20T09:21:32.74"
+                }
+                {
+                "codigoArticulo": "PORTES",
+                "unidades": 1.0,
+                "importeUnitario": 0.00,
+                "concepto": "PORTES Nº Alb: 20991",
+                "numPedido": null,
+                "fechaFactura": "2023-02-20T09:21:32.74"
+                }
+            ]
+*/
+            //formateo los datos recibidos de atenea para saber cuantas facturas hay que crear y si están o no repetidas.
+            //Se comprueba cuantas fechas diferentes hay en los datos recibidos porq no puede existir la misma factura en distintas fechas. UPDATE: Las fechas han de ser iguales.
+            //asi se obtiene el número de lineas factura a crear
+            foreach ($params["detallesFactura"] as $detalleFacturaAtenea) {
+                //formatear la fecha
+                $array_fecha = explode("T", $detalleFacturaAtenea["fechaFactura"]);
+                $fecha = explode("-", $array_fecha[0]);
+                $anyoFactura = $fecha[0];
+                $mesFactura = $fecha[1];
+                $diaFactura = $fecha[2];
+                //si esa fecha no está guardada en el array se pushea
+                $arrFechaFacturaLinea["$anyoFactura-$mesFactura-$diaFactura"][] = $detalleFacturaAtenea;
+            }
+
+            //todos los detalles factura tienen que tener la misma fecha.
+            if (isset($arrFechaFacturaLinea) && is_countable($arrFechaFacturaLinea) && count($arrFechaFacturaLinea) > 1) {
+                $this->_helper->json(array('error' => -1, 'descError' => 'No se pueden añadir detalles con diferentes fechas.'));
+            }
+
+            //proyecto sobre el que se actua
+            $proyecto = $serviceProyecto->getProyectoByCodigoAtenea($params["codigoPresupuesto"]);
+            // No se pueden crear hitos en proyectos finalizados
+            if ($proyecto->getfkidEstado() == $proyecto->getEstadoTerminado()) {
+                My_App::getAdapter()->rollBack();
+                $this->_helper->json(array('error' => -1, 'descError' => 'No se pueden crear facturas en proyectos finalizados.'));
+                exit;
+            }
+
+
+            //iteramos sobre las facturas
+            foreach($arrFechaFacturaLinea as $fechaFactura=> $lineasFactura){
+                $importeFact = 0;
+                $conceptoFact = "";
+                $fecha = explode("-", $fechaFactura);
+                $anyoFactura = $fecha[0] ?? false;
+                $mesFactura = $fecha[1] ?? false;
+                $diaFactura = $fecha[2] ?? false;
+                $conceptoPrimeraLinea = $lineasFactura[0]["concepto"];
+
+                //permisos
+                if(!($fecha && $mesFactura && $diaFactura)){
+                    My_App::getAdapter()->rollBack();
+                    $this->_helper->json(array('error' => -1, 'descError' => 'Faltan parametros que enviar, ¿Es correcto el formato de la fecha?'));
+                    exit;
+                }
+                if (!$acl->isAllowed($this->_oRolUsuario, 'apiFactura', 'Crear recurso')) {
+                    My_App::getAdapter()->rollBack();
+                    $this->_helper->json(array('error' => -1, 'descError' => 'No tiene permiso para crear facturas'));
+                    exit;
+                }
+
+                $factura = $this->getFacturaAtenea($anyoFactura, $mesFactura, $diaFactura, $proyecto->getId(), $params["numeroAlbaran"]);
+                $idFactura = $factura->getId();
+
+                //iterar sobre las lineas de esta factura
+                foreach($lineasFactura as $lineaFactura){
+                    //se comprueba que los datos son correctos
+                    //comprobar si las unidades son correctas
+                    $unidadesLinea = intval(trim($lineaFactura["unidades"]));
+                    if($unidadesLinea <= 0){
+                        My_App::getAdapter()->rollBack();
+                        $this->_helper->json(array('error' => -1, 'descError' => 'Las unidades han de ser un numero entero mayor que 0'));
+                        exit;
+                    }
+
+                    //comprobar que el concepto tiene numero de albaran
+                    $conceptoLinea = trim($lineaFactura['concepto']) ?? "";
+                    $tieneNumeroAlbaran = $this->getNumeroAlbaranByConcepto($conceptoLinea);
+                    if(!$tieneNumeroAlbaran){
+                        My_App::getAdapter()->rollBack();
+                        $this->_helper->json(array('error' => -1, 'descError' => 'El concepto de la factura es erróneo, falta el numero de Albarán'));
+                        exit;
+                    }
+
+                    //comprobar si el numero de pedido es correcto
+                    $numeroPedidoLinea = trim($lineaFactura['numPedido']);
+                    $this->validarNumPedido($proyecto, $numeroPedidoLinea);
+
+                    //comprobar que el periodo no está cerrado
+                    $tipoInterno = $this->getTipoCliente($proyecto);
+                    $periodo = $servicePeriodo->existePeriodoInactivo(intval($anyoFactura), intval($mesFactura), $proyecto->getFkIdEmpresa(), $tipoInterno);
+                    if ($periodo->existInDB()) {
+                        My_App::getAdapter()->rollBack();
+                        $this->_helper->json(array('error' => -1, 'descError' => 'No ha sido posible guardar en este mes, debido a que ya esta cerrado'));
+                        exit;
+                    }
+
+                    // Validar y transformar el importe unitario
+                    $importeUnitarioLinea = trim($lineaFactura['importeUnitario']);
+                    $importeLinea = floatval($unidadesLinea) * floatval($importeUnitarioLinea);
+                    $importeLinea = round($importeLinea, 2);
+
+                        //el importe puede ser negativo
+//                    if($importeLinea < 0){
+//                        My_App::getAdapter()->rollBack();
+//                        $this->_helper->json(array('error' => -1, 'descError' => 'El importe unitario no puede ser negativo.'));
+//                    }
+
+                    //generar linea factura
+                    $linFact = $serviceLineasFactura->get();
+                    $linFact->setFkIdFactura($idFactura);
+                    $linFact->setFkIdOrigen($serviceLineasFactura->getOrigenEstado());
+                    $linFact->setFkIdEstado($serviceLineasFactura->getEstadoPendienteValidar());
+                    $linFact->setConcepto(addslashes($conceptoLinea));
+                    $serviceCategoria = new My_Service_Economico_CategoriaLin();
+                    $categoria = $serviceCategoria->getCategoriaByIdCategoria($lineaFactura["categoria"]);
+                    $idCategoria = $categoria->getId();
+                    if(isset($idCategoria)){
+                        $linFact->setFkIdCategoria($categoria->getIdCategoria());
+                    }else{
+                        $this->_helper->json(array('error' => -1, 'descError' => 'Error al guardar linea factura la categoria '. $lineaFactura["categoria"]. " no existe."));
+                    }
+                    $linFact->setUnidades($unidadesLinea);
+                    $linFact->setImporteUnitario($importeUnitarioLinea);
+                    $linFact->setImporte($importeLinea);
+                    $linFact->setNumeroPedido($numeroPedidoLinea);
+                    //comprobamos si el usuario es el mismo que el validador de la factura si es así el estado de la línea pasa a Aceptado
+                    $serviceProyecto->hasValidate($numeroPedidoLinea, $this->_idJgimeno, $linFact, $serviceLineasFactura, $factura, $pfkidEstado);
+                    try{
+                        $serviceLineasFactura->save($linFact, true);
+                    }catch(Exception $e){
+                        My_App::getAdapter()->rollBack();
+                        $this->_helper->json(array('error' => -1, 'descError' => 'Error al guardar linea factura'));
+                    }
+                }
+
+                $factura = $serviceFactura->actualizarImporteConcepto($factura);
+
+                // hay que generar notificacion de autorizar gasto si la factura esta en estado 15 (pte. validar)
+                $notificarAutorizacionGasto = $factura->getFkIdEstado() == 15;
+                $notificar = $notificarAutorizacionGasto;
+
+
+                $serviceFactura->saveModified($factura, $this->_idJgimeno, $notificar, true, $notificarAutorizacionGasto);
+
+                $numeroAlbaran = $params["numeroAlbaran"];
+                try {
+                    $result = $this->crearIncurrido($fechaFactura, $fechaFactura, $anyoFactura, $mesFactura, $proyecto->getId(), $lineasFactura, $utils, $acl, true, $numeroAlbaran);
+                }  catch (Exception $e) {
+                    if ($e->getPrevious() != null && $e->getPrevious()->getCode() == 23000) {
+                        $this->_helper->json(array('error' => -1, 'descError' => 'Ya existe generado en el mes solicitado.'));
+                        exit;
+                    }
+                    $this->_helper->json(array('error' => -1, 'descError' => 'Error en el proceso 10001 ' . $e->getMessage()));
+                    exit;
+                }
+            }
+        } catch (Exception $e) {
+            My_App::getAdapter()->rollBack();
+            $this->_helper->json(array('error' => -1, 'descError' => 'Error 879: ' . $e->getMessage()));
+            exit;
+        } catch (Throwable $e) {
+            My_App::getAdapter()->rollBack();
+            $this->_helper->json(array('error' => -1, 'descError' => 'Error 773: ' . $e->getMessage()));
+            exit;
+        }
+    }
+
+    private function validarCondicionCompleta($condicion){
+        $esCompleta = true;
+        if (trim($condicion->getContactoTecnico()) == '') {
+            $esCompleta = false;
+        }
+        if (trim($condicion->getEmailTecnico()) == '' || !filter_var(trim($condicion->getEmailTecnico()), FILTER_VALIDATE_EMAIL)) {
+            $esCompleta = false;
+        }
+        if (trim($condicion->getTelefonoTecnico()) == '' ||
+            !My_Utils::validarTelefono(trim($condicion->getTelefonoTecnico()))) {
+            $esCompleta = false;
+        }
+        if (trim($condicion->getContactoFacturacion()) == '') {
+            $esCompleta = false;
+        }
+        if (trim($condicion->getEmailFacturacion()) == '' || !filter_var(trim($condicion->getEmailFacturacion()), FILTER_VALIDATE_EMAIL)) {
+            $esCompleta = false;
+        }
+        if (trim($condicion->getTelefonoFacturacion()) == '' ||
+            !My_Utils::validarTelefono(trim($condicion->getTelefonoFacturacion()))) {
+            $esCompleta = false;
+        }
+        if (trim($condicion->getIdFormaPago()) == '') {
+            $esCompleta = false;
+        }
+
+        $dbFormaPago = new My_Model_Db_Tercero_FormaPago();
+        $formaPago = $dbFormaPago->get($condicion->getIdFormaPago());
+        if ($formaPago['requiereIBAN'] == 1) {
+            if (trim($condicion->getIBAN()) == '' || !preg_match("/^[a-zA-Z]{2}[0-9]{22}$/", trim($condicion->getIBAN()))) {
+                $esCompleta = false;
+            }
+            if (trim($condicion->getSWIFT()) == '' || !preg_match("/^[0-9a-zA-Z]{8,11}$/", trim($condicion->getSWIFT()))) {
+                $esCompleta = false;
+            }
+        }
+
+        if (trim($condicion->getIdTiempoPago()) == '') {
+            $esCompleta = false;
+        }
+        if (trim($condicion->getIdDivisa()) == '') {
+            $esCompleta = false;
+        }
+
+        if ($condicion->getFace()) {
+
+            if (empty(trim($condicion->getOrganoGestor()))) {
+                $esCompleta = false;
+            }
+
+            if (empty(trim($condicion->getUnidadTramitadora()))) {
+                $esCompleta = false;
+            }
+
+            if (empty(trim($condicion->getOficinaContable()))) {
+                $esCompleta = false;
+            }
+        }
+
+        return $esCompleta;
+    }
+    private function getTipoCliente($proyecto) {
+        $serviceProyecto = new My_Service_Proyecto_Proyecto();
+        $serviceTercero = new My_Service_Tercero_Tercero();
+        // Para la nueva gestión de periodos necesitamos saber el tipo proyecto y/o el tipo de cliente
+        $tipoInterno = 1;
+        if ($proyecto->getFkidTipoAct() != $serviceProyecto->getTipoActividadInterna()) {
+            $tercero = $serviceTercero->get($proyecto->getFkidCliente());
+            $tipoInterno = intval($tercero->getEsGrupo());
+        }
+        return $tipoInterno;
+    }
+
+    public function crearIncurrido($fechaFin, $fechaIni, $panyo, $pmes, $pproyecto, $params, $utils, $acl, $isFactura = false, $numeroAlbaran)
+    {
+
+        $serviceIncurrido = new My_Service_Economico_Incurrido();
+        $error = "";
+        $arrIncurridos = array();
+        $fechaGenerada =  strtotime($fechaIni);
+        $mesGenerado = date('m', $fechaGenerada);
+        $anyoGenerado = date('Y', $fechaGenerada);
+        $servicePeriodo = new My_Service_Economico_Periodo();
+        $serviceProyecto = new My_Service_Proyecto_Proyecto();
+
+        $proyecto = $serviceProyecto->get($pproyecto);
+
+        // No se pueden crear hitos en proyectos finalizados
+        if ($proyecto->getfkidEstado() == $proyecto->getEstadoTerminado()) {
+            $this->_helper->json(array('error' => -1, 'descError' => 'No se puede crear generado en proyectos finalizados.'));
+            exit;
+        }
+
+        // Comprobar si el cliente es del grupo
+        $tipoInterno = $this->getTipoCliente($proyecto);
+
+        $periodo = $servicePeriodo->existePeriodoInactivo(intval($anyoGenerado), intval($mesGenerado), $proyecto->getFkIdEmpresa(), $tipoInterno, 'incurrido');
+        // Permiso para crear un incurrido aunque no esté
+        $permisoMesCerrado = ($acl->isAllowed($this->_oRolUsuario, 'numeroFactura', 'Crear recurso')) ? true : false;
+
+        if ($periodo->existInDB() && !$permisoMesCerrado) {
+            $this->_helper->json(array('error' => -1, 'descError' => 'No ha sido posible guardar en ' . intval($anyoGenerado) . '-' . intval($mesGenerado) . ', debido a que ya esta cerrado<br>'));
+            $error .= '';
+        } else {
+            if (!isset($pproyecto) || !isset($panyo) || !isset($pmes)) {
+                $this->_helper->json(array('error' => -1, 'descError' => 'Faltan parametros de entrada'));
+                exit;
+            }
+
+            $incurrido = $serviceIncurrido->getIncurridoByProyectoAndDate(intval($pproyecto), intval($anyoGenerado), intval($mesGenerado));
+
+            if (!$acl->isAllowed($this->_oRolUsuario, 'apiFactura', 'Crear recurso')) {
+                My_App::getAdapter()->rollBack();
+                $this->_helper->json(array('error' => -1, 'descError' => 'No tiene permiso para crear incurridos'));
+                exit;
+            }
+            if ($incurrido->existInDB() && !$isFactura) {
+                $numeroAlbaran = $incurrido->getNoAlbaran();
+                if(!isset($numeroAlbaran)){
+                    $incurrido->setNoAlbaran($numeroAlbaran);
+                }
+            }
+
+            if (!$incurrido->existInDB()) {
+                $incurrido = $serviceIncurrido->get();
+                $incurrido->setAnyo($anyoGenerado);
+                $incurrido->setMes($mesGenerado);
+                $incurrido->setIdProyecto($pproyecto);
+                $incurrido->setAnyoMesFecha($anyoGenerado . '-' . $mesGenerado . '-01');
+                $incurrido->setNoAlbaran($numeroAlbaran);
+                $idIncurrido = $serviceIncurrido->save($incurrido, $this->_idJgimeno, true);
+                $importeInc = 0;
+                $conceptoInc = '';
+                $accion = 'A';
+                $separador = '';
+            } else {
+                $idIncurrido = $incurrido->getId();
+                $importeInc = $incurrido->getImporte();
+                $conceptoInc = $incurrido->getConcepto();
+                $accion = 'M';
+                $separador = '/';
+            }
+
+            $serviceLineasIncurrido = new My_Service_Economico_LineasIncurrido();
+
+
+
+            $message = '';
+            $errLin = '';
+            $numLin = 1;
+            if ($idIncurrido > 0) {
+                $lineasExistentesCollection = $serviceLineasIncurrido->getLineasByIncurrido($idIncurrido);
+
+                //se borran las existentes con el numeroAlbaran actual para añadir las nuevas.
+                foreach($lineasExistentesCollection as $lineaExistente){
+                    if($lineaExistente->getNoAlbaran() == $numeroAlbaran){
+                        $serviceLineasIncurrido->delete($lineaExistente);
+                    }
+                }
+
+                foreach ($params as $linea) {
+                    if ($linea['id'] <> 'params') {
+
+                        $linInc = $serviceLineasIncurrido->get();
+                        $linInc->setFkIdIncurrido($idIncurrido);
+                        $br = '';
+
+                        $conceptoLinea = trim($linea['concepto']);
+                        // $importeLinea = trim($linea['data']['importe']);
+                        switch ($conceptoLinea) {
+                            case null:
+                                $message .= $br . 'El campo concepto debe estar informado';
+                                $br = '<br>';
+                                break;
+                            case '':
+                                $message .= $br . 'El campo concepto debe estar informado';
+                                $br = '<br>';
+                                break;
+                        }
+
+                        $nombreMes = $utils->getNombreMes(ltrim($incurrido->getMes(), '0'));
+                        $conceptoLinea = str_ireplace('%mes%', $nombreMes, $conceptoLinea);
+                        $conceptoLinea = str_ireplace('%año%', $incurrido->getAnyo(), $conceptoLinea);
+                        $fechaConcepto = DateTime::createFromFormat('Y-m-d', $incurrido->getAnyo() . '-' . $incurrido->getMes() . '-01');
+                        // Fecha del mes anterior a la factura
+                        $fechaMesAnterior = clone $fechaConcepto;
+                        $fechaMesAnterior->modify('-1 day');
+                        $nombreMesAnterior = $utils->getNombreMes(ltrim($fechaMesAnterior->format('m'), '0'));
+                        $conceptoLinea = str_ireplace('%mesanterior%', $nombreMesAnterior, $conceptoLinea);
+                        $conceptoLinea = str_ireplace('%añomesanterior%', $fechaMesAnterior->format('Y'), $conceptoLinea);
+                        // Fecha del mes siguiente a la factura
+                        $fechaMesSiguiente = clone $fechaConcepto;
+                        $fechaMesSiguiente->modify('first day of next month');
+                        $nombreMesSiguiente = $utils->getNombreMes(ltrim($fechaMesSiguiente->format('m'), '0'));
+                        $conceptoLinea = str_ireplace('%messiguiente%', $nombreMesSiguiente, $conceptoLinea);
+                        $conceptoLinea = str_ireplace('%añomessiguiente%', $fechaMesSiguiente->format('Y'), $conceptoLinea);
+                        //$importeLinea = floatval($unidadesLinea) * floatval($importeUnitarioLinea);
+                        //echo var_dump($linea['data']['importe']); exit;
+                        $categoria = $linea["categoria"];
+                        $this->validarFormatoImporte($linea['importeUnitario'], 'El campo importe debe ser mayor que 0', $categoria);
+
+                        if($linea['importeUnitario'] != 0){
+                            $importeLinea = floatval(round(My_Utils::formatNumber(floatval($linea['importeUnitario']) * floatval($linea['unidades']), $categoria), 2));
+                        }else{
+                            $importeLinea = 0;
+                        }
+
+                        $errLin .= ($message <> '') ? $message : '';
+
+                        if ($errLin <> '') {
+                            $errLin .= ' en la línea: ' . $numLin;
+                            My_App::getAdapter()->rollBack();
+                            $this->_helper->json(array('error' => -1, 'descError' => $errLin));
+                            exit;
+                        }
+
+                        $linInc->setConcepto(addslashes($conceptoLinea));
+                        $linInc->setImporte($importeLinea);
+                        $linInc->setNoAlbaran($numeroAlbaran);
+                        $serviceLineasIncurrido->save($linInc, true);
+                        $importeInc += $importeLinea;
+                        $conceptoInc .= $separador . trim($conceptoLinea);
+                        $separador = '/';
+                    }
+                }
+            }
+
+            $incurrido->setImporte(addslashes($importeInc));
+            $incurrido->setConcepto(addslashes($conceptoInc));
+
+            $serviceIncurrido->saveModified($incurrido, $this->_idJgimeno, true);
+
+            $arrIncurridos[] = array('idProyecto' => $incurrido->getIdProyecto(),
+                'anyo' => $incurrido->getAnyo(),
+                'mes' => intval($incurrido->getMes()),
+                'accion' => $accion);
+
+        }
+
+        return $result = ['error' => $error, 'arrIncurridos' => $arrIncurridos];
+    }
+
+    private function validarFormatoImporte($importe, $nombreCampo = '', $categoria) {
+        if (($importe == 0 || empty($importe)) && strtoupper($categoria) !== "TEXTO") {
+            throw new \Exception($nombreCampo . ' no puede ser nulo');
+        }
+        // Ni punto ni coma
+        if (strpos($importe, ',') === false && strpos($importe, '.') === false) {
+            return floatval($importe);
+        }
+        // Solo viene punto
+        else if (strpos($importe, ',') === false && strpos($importe, '.') > -1) {
+            return floatval($importe);
+        }
+        // Solo viene coma --> Reemplazarla por punto
+        else if (strpos($importe, ',') > -1 && strpos($importe, '.') === false) {
+            $importe = str_replace(',', '.', $importe);
+            return floatval($importe);
+        }
+        // Viene primero el punto y después la coma 1.250,60
+        else if (strpos($importe, ',') > -1 && strpos($importe, '.') > -1 && strpos($importe, '.') < strpos($importe, ',')) {
+            $importe = str_replace('.', '', $importe);
+            $importe = str_replace(',', '.', $importe);
+            return floatval($importe);
+        }
+        else {
+            throw new \Exception('Formato no válido para el ' . $nombreCampo);
+        }
+    }
+
+
+    private function getNumeroAlbaranByConcepto($pConcepto){
+        //Solo puede haber una factura en cada proyecto de atenea pero desde unhiberse se pueden añadir más.
+        //El numero de albarán solo está en las facturas de atenea.
+        //Esto es para que, si un proyecto tiene varias facturas, solo se gestione la de atenea que debe ser la única con numero albaran.
+        preg_match('/N Alb: (\d+)/', $pConcepto, $matches);
+
+        return $matches[0] ?? null;
+    }
+
+    private function getEsClienteGrupo(My_Model_Proyecto_ProyectoEntity $proyecto) {
+        $serviceProyecto = new My_Service_Proyecto_Proyecto();
+        $serviceTercero = new My_Service_Tercero_Tercero();
+        $cliente = $serviceTercero->get();
+        // Cliente del proyecto asociado a la factura
+        if (!empty($proyecto->getFkidCliente())) {
+            $cliente = $serviceTercero->getTercero($proyecto->getFkidCliente());
+        }
+        // Cliente del proyecto padre asociado al proyecto de la factura
+        else if (!empty($proyecto->getFkIdProyecto())) {
+            $idProyecto = $proyecto->getFkidProyecto();
+            $proyectoPadre = $serviceProyecto->getProyecto($idProyecto, false, false);
+            $proyecto = ($proyectoPadre->count() > 0) ? $proyectoPadre->getFirst() : new My_Model_Proyecto_ProyectoEntity();
+            $cliente = $serviceTercero->getTercero($proyecto->getFkidCliente());
+        }
+
+        if (isset($cliente) && get_class($cliente) == My_Model_Tercero_TerceroCollection::class) {
+            $cliente = ($cliente->count() > 0) ? $cliente->getFirst() : new My_Model_Tercero_TerceroEntity();
+        }
+        return boolval($cliente->getEsGrupo());
+    }
+
+    private function validarNumPedido($proyecto, $numeroPedidoLinea){
+        $esClienteGrupo = $this->getEsClienteGrupo($proyecto);
+
+        if ($esClienteGrupo && empty($numeroPedidoLinea)) {
+            My_App::getAdapter()->rollBack();
+            $this->_helper->json(array('error' => -1, 'descError' => 'El número de pedido es incorrecto.'));
+        }
+        /**Validamos que el Numero de Pedido sea correcto en caso de corresponder a una empresa/cliente/tercero con ID Axapta**/
+        if ($proyecto->getFkidCliente() != null) {
+            $serviceEmpresa = new My_Service_Tercero_Tercero();
+            $serviceProyecto = new My_Service_Proyecto_Proyecto();
+            $codigoIncorrecto = true;
+            $empresasAX = $serviceEmpresa->getEmpresaAXByTercero($proyecto->getFkidCliente());
+
+            if ($empresasAX->count() > 0 && !empty($numeroPedidoLinea)) {
+                foreach ($empresasAX as $empresaAX) {
+                    $proyectos = $serviceProyecto->getProyectosByEmpresa($empresaAX['id'], $numeroPedidoLinea);
+                    if ($proyectos->count() != 0) {
+                        $codigoIncorrecto = false;
+                        break;
+                    }
+                }
+                if ($codigoIncorrecto) {
+                    My_App::getAdapter()->rollBack();
+                    $this->_helper->json(array('error' => -1, 'descError' => 'El número de pedido es incorrecto.'));
+                    exit;
+                }
+            }
+        }
+    }
+
+    private function getFacturaAtenea($anyoFactura, $mesFactura, $diaFactura, $idProyecto, $pNumeroAlbaran){
+        //si existe una factura de atenea en el periodo indicado te la devuelve, en caso contrario devuelve una plantilla a rellenar de una factura nueva.
+        $factura = null;
+        $serviceFactura = new My_Service_Economico_Factura();
+        $serviceLineasFactura = new My_Service_Economico_LineasFactura();
+
+        //comprobar si la linea ya existe
+        $factura = $serviceFactura->getFacturaAtenea($pNumeroAlbaran);
+
+
+        //si no existe el numero de albarán se genera
+        if ($factura->existInDB()) {
+            $this->borrarFacturaConIncurrido($factura->getNoAlbaran());
+        }
+        $factura = $this->crearPlantillaFacturaAtenea($anyoFactura, $mesFactura, $diaFactura, $idProyecto, $pNumeroAlbaran);
+
+        return $factura;
+    }
+
+    private function crearPlantillaFacturaAtenea($anyoFactura, $mesFactura, $diaFactura, $idProyecto, $numeroAlbaran){
+        $serviceFactura = new My_Service_Economico_Factura();
+
+        $factura = $serviceFactura->get();
+        $factura->setEsPrimera(0);
+        $factura->setAnyo($anyoFactura);
+        $factura->setMes($mesFactura);
+        $factura->setIdProyecto($idProyecto);
+        $factura->setConcepto("");
+        $factura->setAnotacion("");
+        $factura->setAtencion("");
+        $factura->setFkIdOrigen($serviceFactura->getOrigenEstado());
+        $factura->setFkIdEstado($serviceFactura->getEstadoLista());
+        $factura->setNoAlbaran($numeroAlbaran);
+        $string_fecha = ("$anyoFactura-$mesFactura-$diaFactura");
+        $fecha = strtotime($string_fecha);
+        $fechaFormateada = date('Y-m-d', $fecha);
+        $factura->setAnyoMesFecha($fechaFormateada);
+        $factura->setSerie(null);
+        $factura->setFkIdUsuarioCreador($this->_idJgimeno);
+        $idFactura = $serviceFactura->save($factura, $this->_idJgimeno,true);
+
+        return $factura;
+    }
+    private function enviarMailAceptadoSinContrato($idProyecto, $nombreProyecto) {
+        $Utils = new My_Utils();
+        $address = !in_array($_SESSION['entorno']['tipo'], array('local', 'pre')) ? "unhiberse@hiberus.com": $_SESSION['entorno']['mail'];
+        $subject = 'Unhiberse - Proyecto aceptado sin contrato';
+        $bodyHtml = '<html>
+		        <body style="font-size:15px; font-family:Tahoma; color:#393939;">
+					Se ha aceptado el proyecto <strong style="color:#3087B8;">'. $idProyecto .' - '. $nombreProyecto .'</strong> pero no se ha subido el fichero del contrato.
+					<hr>
+				</body>
+				</html>';
+
+        $altBody = "Se ha aceptado el proyecto ". $idProyecto ." - ". $nombreProyecto ." pero no se ha subido el fichero del contrato.";
+        $envio = $Utils::enviarEmail($address, $subject, $bodyHtml, $altBody);
+    }
+
+    private function comprobacionesActividadClienteFinal($proyecto, $nombreGrupoCrear, $pCodigoProyecto, $clienteAsociado){
+        $serviceProyecto = new My_Service_Proyecto_Proyecto();
+        $serviceGrupoCliente = new My_Service_Tercero_Grupo();
+
+        if(isset($pCodigoProyecto) && !empty($pCodigoProyecto)){
+            $proyecto->setCodigoProyecto($pCodigoProyecto);
+
+            $proyectoCodigoProyecto = $serviceProyecto->getProyectoByIdString($pCodigoProyecto) ?? "";
+            if($proyectoCodigoProyecto != ""){
+                $serviceTercero = new My_Service_Tercero_Tercero();
+                $empresasAX = $serviceTercero->getEmpresaAXByTercero($clienteAsociado);
+
+                if ($empresasAX->count() > 0) {
+                    $tieneEmpresasAX = true;
+                }else{
+                    $tieneEmpresasAX = false;
+                }
+
+                if($tieneEmpresasAX && $nombreGrupoCrear && $nombreGrupoCrear != ""){
+                    //antes de guardar comprobar que el nombre de grupo no es un cliente con empresas asociadas. Esto para evitar la creación
+                    // de grupo hiberus, hiberus tecnología etc
+                    $nombreTercero = $serviceTercero->get($clienteAsociado)->getNombre();
+                    if($nombreTercero != $nombreGrupoCrear){
+                        //ahora se realiza la creación de nuevo grupo y se le asigna al proyecto asociado y al proyecto en cuestión
+                        $idGrupoCreado = $serviceGrupoCliente->saveGrupo("Grupo ".$nombreGrupoCrear);
+                        $proyecto->setFkIdGrupoCliente($idGrupoCreado);
+                        $proyectoCodigoProyecto->setFkIdGrupoCliente($idGrupoCreado);
+                        if($proyectoCodigoProyecto->getFkidCliente() != null){
+                            //asociar el tercero al grupo.
+                            $result = $serviceGrupoCliente->addTerceroByGrupo($idGrupoCreado, $proyectoCodigoProyecto->getFkidCliente());
+                        }
+                    }
+                }
+            }else{
+                My_App::getAdapter()->rollBack();
+                $this->_helper->json(array('error' => -1, 'descError' => 'El código proyecto es incorrecto'));
+            }
+        }
+        return $proyecto;
+    }
+
+    private function comprobarCodigoProyecto($pCodigoProyecto, $clienteAsociado, $proyecto)
+    {
+        //nota. Numero de pedido es lo mismo que codigo de proyecto, solo que a nivel de factura.
+        $serviceProyecto = new My_Service_Proyecto_Proyecto();
+        //se comprueba siempre si tiene empresas asociadas y si es proyecto de la empresa.
+        $serviceTercero = new My_Service_Tercero_Tercero();
+        $empresasAX = $serviceTercero->getEmpresaAXByTercero($clienteAsociado);
+
+        if ($empresasAX->count() > 0) {
+            $tieneEmpresasAX = true;
+        } else {
+            $tieneEmpresasAX = false;
+        }
+
+        //si tiene empresasAX asociadas se comprueba el código proyecto que no puede estar vacío.
+        if ($tieneEmpresasAX) {
+            if (!empty($pCodigoProyecto)) {
+                $proyectoCodigoProyecto = $serviceProyecto->getProyectoByIdStringByUser($pCodigoProyecto, $this->_idJgimeno) ?? "";
+                $proyectoExistente = $proyectoCodigoProyecto->getId() != null;
+                if (!$proyectoExistente) {
+                    My_App::getAdapter()->rollBack();
+                    $this->_helper->json(array('error' => -1, 'descError' => 'El numero de pedido indicado no corresponde a ningún proyecto'));
+                }
+
+                $codigoIncorrecto = true;
+                //se comprueba que el proyecto indicado en el numero de pedido está asociado a la empresa
+                foreach ($empresasAX as $empresaAX) {
+                    $proyectos = $serviceProyecto->getProyectosByEmpresa($empresaAX['id'], $pCodigoProyecto);
+
+                    if ($proyectos->count() > 0) {
+                        $proyecto->setCodigoProyecto($pCodigoProyecto);
+                        $codigoIncorrecto = false;
+                    }
+                }
+                if ($codigoIncorrecto) {
+                    My_App::getAdapter()->rollBack();
+                    $this->_helper->json(array('error' => -1, 'descError' => 'Por favor, compruebe si el numero de pedido '.$pCodigoProyecto.' está asociado a la empresa y al cliente'));
+                }
+            } else {
+                My_App::getAdapter()->rollBack();
+                $this->_helper->json(array('error' => -1, 'descError' => 'El código proyecto no puede estar vacío'));
+            }
+        }
+        return $proyecto;
+    }
+
+    private function comprobarSiHayEmpresasAsociadas($idClienteAsociado){
+        $serviceTercero = new My_Service_Tercero_Tercero();
+        $empresasAX = $serviceTercero->getEmpresaAXByTercero($idClienteAsociado);
+
+        if ($empresasAX->count() > 0) {
+            $tieneEmpresasAX = true;
+        } else {
+            $tieneEmpresasAX = false;
+        }
+        return $tieneEmpresasAX;
+    }
+
+    private function getGrupoCliente($idActividad, $idProyecto, $idCliente){
+        $serviceGrupoCliente = new My_Service_Tercero_Grupo();
+        $serviceProyecto = new My_Service_Proyecto_Proyecto();
+        $serviceTercero = new My_Service_Tercero_Tercero();
+        $grupos =  $serviceGrupoCliente->getGrupos()->getElements();
+        $arrJson = array();
+
+        foreach ($grupos as $grupo){
+            $arrJson["grupos"][$grupo->getId()] = $grupo->getNombre();
+        }
+
+        //Si es cliente final devuelve todos los grupos.
+        if ($idActividad == "1"){
+            $aux = $arrJson["grupos"];
+            $acl = Zend_Registry::getInstance()->Acl;
+            $puedeCambiarClienteGrupoFinal = $acl->isAllowed($this->_oRolUsuario, 'clienteGrupoFinalProyecto', 'Editar recurso');
+            if(!$puedeCambiarClienteGrupoFinal){
+                $arrJson["grupos"] = array();
+            }
+
+            if($idProyecto != null && $idCliente != null){
+
+                $proyecto = $serviceProyecto->get($idProyecto);
+                $clienteAsociado = $serviceTercero->get($idCliente);
+
+                if($proyecto->getFkIdGrupoCliente()){
+                    $arrJson["grupoSelected"] = $proyecto->getFkIdGrupoCliente();
+                }
+                else if($clienteAsociado){
+                    if($serviceGrupoCliente->getIdGrupoByTercero($clienteAsociado->getId())){
+                        $arrJson["grupoSelected"] = $serviceGrupoCliente->getIdGrupoByTercero($clienteAsociado->getId());
+                    } else{
+                        $arrJson["grupos"]["fkIdCliente"] = $clienteAsociado->getNombre();
+                        $arrJson["grupoSelected"] = "fkIdCliente"; //cuando se envía fkIdCliente como clave el grupo Cliente no se guarda sería solo visual.
+                    }
+                }
+            }
+            else if($idCliente != null){
+                $clienteAsociado = $serviceTercero->get($idCliente);
+
+                if($clienteAsociado){
+                    if($serviceGrupoCliente->getIdGrupoByTercero($clienteAsociado->getId())){
+                        $arrJson["grupoSelected"] = $serviceGrupoCliente->getIdGrupoByTercero($clienteAsociado->getId());
+                    } else{
+                        $arrJson["grupos"]["fkIdCliente"] = $clienteAsociado->getNombre();
+                        $arrJson["grupoSelected"] = "fkIdCliente"; //cuando se envía fkIdCliente como clave el grupo Cliente no se guarda sería solo visual.
+                    }
+                }
+            }
+
+            if(!$puedeCambiarClienteGrupoFinal){
+                if(!isset($arrJson["grupos"]["fkIdCliente"])){
+                    $arrJson["grupos"][$arrJson["grupoSelected"]] = $aux[$arrJson["grupoSelected"]];
+                }
+            }
+        }
+
+        //Si el id actividad es INVERSIÓN entonces solo se envía la opción INTERNO.
+        if($idActividad == "2"){
+            if($serviceProyecto->get($idProyecto)->getFkIdGrupoCliente()){
+                $idGrupoCliente = $serviceProyecto->get($idProyecto)->getFkIdGrupoCliente();
+                $arrJson["grupos"] = array();
+                $arrJson["grupos"][$idGrupoCliente] = $serviceGrupoCliente->get($idGrupoCliente)->getNombre();
+                $arrJson["grupoSelected"] = $idGrupoCliente;
+            }else{
+                $internoIndex = array_search("INTERNO",$arrJson["grupos"],true);
+                $arrJson["grupos"] = array();
+                if(isset($internoIndex)){
+                    $arrJson["grupos"][$internoIndex] = "INTERNO";
+                    $arrJson["grupoSelected"] = $internoIndex;
+                }
+            }
+        }
+
+        //Si el id actividad es producción interna se vacía el array de grupos y se envía el grupo del cliente o el cliente en sí no se puede modificar.
+        if($idActividad == "3"){
+            $aux = $arrJson["grupos"];
+            $arrJson["grupos"] = array();
+            $esProyecto = false;
+            $proyectoM = $serviceProyecto->get($idProyecto);
+
+            if($proyectoM->getFkIdGrupoCliente()){
+                $arrJson["grupoSelected"] = $proyectoM->getFkIdGrupoCliente();
+                $arrJson["grupos"][$proyectoM->getFkIdGrupoCliente()] = $aux[$proyectoM->getFkIdGrupoCliente()];
+            }else{
+                if($idCliente != null){
+                    $proyecto = $serviceProyecto->get($idCliente);
+                    if($proyecto->getFkidCliente() != null){
+                        $proyectoAsociado = $serviceTercero->get($proyecto->getFkidCliente());
+                    }
+                    else{
+                        $proyectoAsociado = $serviceProyecto->get($proyecto->getFkidProyecto());
+                        $esProyecto = true;
+                    }
+
+                    if($proyecto->getFkIdGrupoCliente()){
+                        $arrJson["grupoSelected"] = $proyecto->getFkIdGrupoCliente();
+                        $arrJson["grupos"][$proyecto->getFkIdGrupoCliente()] = $aux[$proyecto->getFkIdGrupoCliente()];
+                    }
+                    else if($serviceGrupoCliente->getIdGrupoByTercero($proyectoAsociado->getId())){
+                        $arrJson["grupoSelected"] = $serviceGrupoCliente->getIdGrupoByTercero($proyectoAsociado->getId());
+                        $arrJson["grupos"][$arrJson["grupoSelected"]] = $aux[$arrJson["grupoSelected"]];
+                    }
+                    else if($esProyecto){
+                        if($proyectoAsociado->getFkIdGrupoCliente()){
+                            $arrJson["grupoSelected"] = $proyectoAsociado->getFkIdGrupoCliente();
+                            $arrJson["grupos"][$arrJson["grupoSelected"]] = $aux[$arrJson["grupoSelected"]];
+                        }
+                        else{
+                            $arrJson["grupoSelected"] = "fkIdCliente"; //cuando se envía fkIdCliente como clave el grupo Cliente no se guarda sería solo visual.
+                            $arrJson["grupos"]["fkIdCliente"] = $proyectoAsociado->getNombre();
+                        }
+                    }
+                    else{
+                        $arrJson["grupoSelected"] = "fkIdCliente"; //cuando se envía fkIdCliente como clave el grupo Cliente no se guarda sería solo visual.
+                        $arrJson["grupos"]["fkIdCliente"] = $proyectoAsociado->getNombre();
+                    }
+                }
+            }
+        }
+
+        return $arrJson;
+    }
+}
